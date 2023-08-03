@@ -1,1 +1,185 @@
+Ejpt Notes, created by Ramkrishna Mishra on 03-08-2023.
+Note::::Also scan the udp ports and unzip the rockyou wordlist by using, "gzip -d <path to rockyou>"
+
+1.Assessment Methodologies:
+
+1.1  Information gathering:
+		Host discovery:
+			• nmap -sn <netblock>
+			• sudo netdiscover  -i <interface> -r <range>
+			• -sC switch in nmap(default script)
+1.2 Footprinting & Scanning:
+			sudo arp-scan -I <interface> tap0 -g <CIDR>
+			tool: fping
+			NET api attack~
+			Nmap automator ~
+			Auto recon~
+
+1.3 Enumeration:
+ 
+	SMB:/SIFS
+	 	 SMB lab:
+			  Windows:
+					 Connecting With SMB to a remote IP Using GUI:
+						  file explorer -->network-->map network drive-->\\ip-->select drive-->credentials connect.
+						
+					 Disconnecting SMB using powershell:
+						   net use * /delete
+						
+					Connecting With SMB to a remote IP Using Powershell:
+						   net use (drive, z): \\<ip>\c(our desired drive)$ password /      user:username
+						   eg: net use z: \\10.5.30.39\c$ smbserver_771 /user:administrator
+						
+					Nmap for SMB:
+					
+						smb_enum
+					   		 --script-args smbusername=administrator,smbpassword=smb_server_771
+	
+					SMBMAP (tool for enumerating):
+						- smbmap -u guest -p "" -d . -H <ip> #it'll list all the drives and shares
+					    -x 'command' #it'll execute the command specified to the remote system
+	
+					    -L #It'll list all the drives
+					    -r 'C$' #It'll connect to c drive we can change it.
+					    --upload '/root/backdoor' 'C$\backdoor'  #it'll upload the file
+					    --download 'C$\flag.txt'
+	
+			 Linux:
+					Metasploit:
+						smb_version
+						 
+					Nmblookup: #discovery tool
+						- nmblookup -A ip
+						
+					SMBclient: #tool for connecting 
+						- smbcleint -L <ip> -N 
+						- smbclient //<ip>>/public
+							#use get for downloading 
+						  smbclient -U "" //192.229.179.3/public -N
+	
+					RPCclient: 
+						- rpcclient -U "" -N <ip> #for connecting using null session
+						- enumdomusers #for user list enumeration
+						- enumdogroups 
+						- lookupnames admin
+	
+		 			enum4linux: 
+		
+				    Metasploit:
+	 					smb2 
+	 					smblogin
+	 					pipe_auditor #it'll enumerate smb pipe
+	
+					Hydra:
+			   			#Unzip the rockyou wordlist
+						  hydra :uppercase -> file, lowercase: value
+						 hydra -l admin -p <password file> <ip> <protocol>
+						
+					SMBmap:
+						#logging in with the bruteforced creds
+						 smbmap -H <ip> -u admin -p <password>
+		
+		• FTP
+		  Nmap Anon Login
+		  Brute-Force With hydra
+		
+		• SSH 
+			 Banner Grabbing
+		 		 -> Nmap
+				 -> Netcat
+		    Nse script for ssh:
+				 ▪ ssh2-enum-algos
+				 ▪ ssh-hostkey --script-args ssh_hostkey=full -->it'll give the full ssh rsa hoskey
+				 ▪ ssh-auth-methods --script-args="ssh.user=student"
+				 ▪ pulling the rsa host key of the host machine
+	
+			SSH Dictionary Attack:
+				  nmap: --script ssh-brute --script-args userdb=<path to users list file>
+				  msfvenom : ssh_login (pass file: metasploit root user pass.txt)
+	
+		• HTTP
+			 nmap Scripts for HTTP:
+				 -  http-enum
+				 -  http-headers
+				 -  http-methods --script-args http-methods.url-path=/<foldername>/
+				 -  http-webdav-scan --script-args http-methods.url-path=/<foldername>/
+			IIS: 
+				 * open in browser,
+				 * search whatweb
+				  http <ip> in terminal
+				  dirb <url>
+				  browsh --startup-url <url> # renders the website in terminal
+	
+			 Apache:
+				 nmap Script for Apache:
+				 	script -banner
+				
+				 Msfconsole for Apache:
+					  http_version
+					  brute_dirs
+					  robots_txt
+					
+				 Cmd line utilities:
+					  curl <url> | more (more gives one page at a time)
+					  wget "<url>/index"  ( we can analyze index file)
+					  browsh --startup-url <ip>
+					  crtl q # for getting out 
+					  lynx http://ip
+	
+		•MySQL
+			  for connecting:
+				 ▪  mysql -h <ip> -u  root
+				 ▪  show databases
+				 ▪  use books
+				 ▪  select count(*) from authors;
+				 ▪  select * from authors;
+				
+			 Using msfconsole for MySQL:
+				▪ mysql_writable_dirs
+					  - setg rhost: #g sets it as a global variable
+					   - set password ""
+				▪ mysql_hashdump # it'll give us all the hashes
+			    ▪ mysql_schemadump
+			    ▪ login to mysql:
+			    ▪ - select load_file("/etc/shadow");
+	
+			Using Nmap for MYSQL:
+				 ▪ --script=mysql-empty-password
+				 ▪ --script=mysql-info
+				 ▪ --script=mysql-users --script-args="mysqluser=' root' ,mysqlpass='' "
+				 ▪ --script=mysql-databases --script-args="mysqluser=' root' ,mysqlpass='' "
+				 ▪ --script=mysql-variables --script-args="mysqluser=' root' ,mysqlpass='' "
+				 ▪ - look for data directory(data-dir) in the above command
+				 ▪ --script=mysql-audit --script-args="mysql-audit.username=' root' ,mysql-audit.password='' ,mysql-audit.filename='/usr/share/nmap/nselib/data/mysql-cis.audit'"
+				 ▪ --script=mysql-dump-hashes --script-args="username='root',password=''"
+				 ▪ --script=mysql-query --script-args="query='select count(*) from books.authors;', username='root',password=''"
+				 	 
+			For bruteforing:
+			 	▪ mysql_login (msf)
+		 
+		•Mssql
+			 ▪ type c:\flag.txt (similar to cat in linux)
+			 Using nmap for MSSQL:
+				 ▪ - --script=mssql-info
+				 - --script=ms-sql-ntlm-info --script-args mssql.instance-port=1433
+				 - --script=ms-sql-brute --script-args userdb=<path to userfile>,passdb=<path to pw file>
+				 - --script=ms-sql-empty-password
+				 - --script=ms-sql-query --script-args mssql..username=<>,mssql.password=<>,ms-sql-query="SELECT * FROM master..syslogins" -oN <filename>
+				 - --script=ms-sql-dump-hashes --script-args mssql.username=<>,mssql.password=<>
+				 - --script=ms-sql-xp-cmdshell --script-args mssql.username=<>,mssql.password=<>,ms-sql-xp-cmdshell.cmd="ip-config"
+				 - cmd="type: c:\flag.txt"
+			Using Msfconsole for Mssql:
+				 - mssql_login
+				 - mssql_enum(from auxiliary admin)
+				 - mssql_enum_sql_logins
+				 - mssql_exec (we can execute commands)
+				 - mssql_enum_domain_accounts
+		 
+ 
+
+
+
+
+
+
 
